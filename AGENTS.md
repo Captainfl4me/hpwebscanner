@@ -1,15 +1,15 @@
 # hpwebscanner - Agent Guidelines
 
 ## Project Overview
-Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle PDF storage and scanner communication. Designed for Home Assistant integration.
+Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image (JPG) storage and scanner communication. Designed for Home Assistant integration.
 
 ## Requirements
 - Python-based REST API with FastAPI
-- Two endpoints:
-  1. `/health` - Scanner connection status
-  2. `/scan` - Trigger scan and save PDF to predefined folder
+ - Two endpoints:
+   1. `/health` - Scanner connection status
+   2. `/scan` - Trigger scan and save JPG image to predefined folder
 - Act as client to HP EWS/ESCL (no PDF processing)
-- Docker container: self-contained, exposes API
+ - (Future) Docker container: self-contained, exposes API
 - Origin validation via configurable ENV var (ALLOWED_IP)
 - Logging with configurable levels (INFO, WARN, ERROR)
 
@@ -28,10 +28,10 @@ Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle PDF storag
 - PDF retrieval: GET from NextDocument URL (immediate with ESCL)
 
 ## Configuration
-- **SCANNER_IP**: (required) Environment variable for HP scanner address
-- **SAVE_FOLDER**: Environment variable for PDF storage path (default: `/scans`)
-- **ALLOWED_IP**: Environment variable for API origin validation (default: `127.0.0.1`, empty string allows all)
-- **LOG_LEVEL**: Environment variable for logging (default: `INFO`)
+ - **SCANNER_IP**: (required) Environment variable for HP scanner address
+ - **SAVE_FOLDER**: Environment variable for image storage path (default: `./`)
+ - **ALLOWED_IP**: Environment variable for API origin validation (default: `127.0.0.1`, empty string allows all)
+ - **LOG_LEVEL**: Environment variable for logging (default: `INFO`)
 
 ## API Endpoints
 - `GET /health` - Returns scanner status (checks connectivity to `/eSCL/ScannerCapabilities`)
@@ -70,18 +70,22 @@ source venv/bin/activate
 
 # Set required environment variables
 export SCANNER_IP="192.168.1.100"
-export SAVE_FOLDER="/scans"
+export SAVE_FOLDER="./scans"
 export ALLOWED_IP="127.0.0.1"
 export LOG_LEVEL="INFO"
 
-# Run with fastapi (uses uvicorn under the hood)
-fastapi run main:app --host 0.0.0.0 --port 8000 --reload
+# Add src directory to Python path (source is in src/)
+export PYTHONPATH=src
+
+# Run with uvicorn
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ## Development Notes
 - Maintain async compatibility with FastAPI
 - Handle XML namespaces correctly (pwg and scan namespaces)
 - Implement proper error handling and logging
-- Ensure Dockerfile includes only necessary dependencies
+- ESCL protocol returns images immediately (no polling needed)
 - Test with actual HP ESCL device when available
 - Python source code is located inside `src` folder.
+- Immediate download: The `/scan` endpoint downloads the JPG immediately after job submission (ESCL protocol)
