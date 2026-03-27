@@ -1,7 +1,7 @@
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from src.main import OriginValidationMiddleware
+from main import OriginValidationMiddleware
 
 @pytest.fixture
 def app_with_middleware():

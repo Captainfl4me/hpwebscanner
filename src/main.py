@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from contextlib import asynccontextmanager
 import logging
 import os
 import sys
@@ -34,22 +35,21 @@ logger.info(f"SAVE_FOLDER: {SAVE_FOLDER}")
 logger.info(f"ALLOWED_IP: {ALLOWED_IP}")
 logger.info(f"LOG_LEVEL: {LOG_LEVEL}")
 
-app = FastAPI()
-
-# Job storage and lock
+# Job storage and lock (kept for status tracking, though scans are immediate)
 jobs: Dict[str, Dict[str, Any]] = {}
 jobs_lock = asyncio.Lock()
 
-# Lifespan events for EWSClient
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     app.state.ews_client = EWSClient(SCANNER_IP)
     logger.info("EWS client initialized")
-
-@app.on_event("shutdown")
-async def shutdown_event():
+    yield
+    # Shutdown
     await app.state.ews_client.close()
     logger.info("EWS client closed")
+
+app = FastAPI(lifespan=lifespan)
 
 # Origin validation middleware
 class OriginValidationMiddleware(BaseHTTPMiddleware):
@@ -74,50 +74,7 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(OriginValidationMiddleware, allowed_ip=ALLOWED_IP)
 
-async def process_scan_job(job_id: str, job_url: str):
-    """Background task to process scan job (poll and save PDF)."""
-    async with jobs_lock:
-        if job_id in jobs:
-            jobs[job_id]['status'] = 'Processing'
-    
-    try:
-        client = app.state.ews_client
-        logger.info(f"Processing job {job_id} - waiting for completion")
-        
-        # Wait for job to complete
-        final_status = await client.wait_for_completion(job_url)
-        state = final_status['state']
-        
-        async with jobs_lock:
-            if job_id in jobs:
-                jobs[job_id]['state'] = state
-        
-        if state == 'Completed' and final_status.get('binary_url'):
-            # Download PDF
-            pdf_url = final_status['binary_url']
-            filename = f"scan_{job_id}.pdf"
-            save_path = f"{SAVE_FOLDER.rstrip('/')}/{filename}"
-            
-            await client.download_pdf(pdf_url, save_path)
-            
-            async with jobs_lock:
-                if job_id in jobs:
-                    jobs[job_id]['saved_path'] = save_path
-                    jobs[job_id]['status'] = 'Completed'
-            
-            logger.info(f"Job {job_id} completed, PDF saved to {save_path}")
-        else:
-            async with jobs_lock:
-                if job_id in jobs:
-                    jobs[job_id]['status'] = state
-            logger.info(f"Job {job_id} finished with state: {state}")
-    
-    except Exception as e:
-        logger.error(f"Error processing job {job_id}: {e}")
-        async with jobs_lock:
-            if job_id in jobs:
-                jobs[job_id]['status'] = 'Error'
-                jobs[job_id]['error'] = str(e)
+
 
 @app.get("/health")
 async def health_check():
@@ -148,39 +105,52 @@ async def health_check():
         }
 
 @app.post("/scan")
-async def trigger_scan(background_tasks: BackgroundTasks):
-    """Endpoint to trigger a new scan job."""
+async def trigger_scan():
+    """Endpoint to trigger a new scan job and immediately download the result."""
     logger.info("Scan request received")
     
     try:
         client = app.state.ews_client
+        # Submit scan job and get the next document URL (direct download)
         job_info = await client.submit_scan_job()
         job_id = job_info['job_id']
         job_url = job_info['job_url']
+        next_doc_url = job_info['next_document_url']
         
-        # Store job info
+        # Store initial job info
         async with jobs_lock:
             jobs[job_id] = {
                 'job_url': job_url,
-                'status': 'Submitted',
-                'state': None
+                'status': 'Downloading',
+                'saved_path': None
             }
         
-        # Start background processing
-        background_tasks.add_task(process_scan_job, job_id, job_url)
+        # Download the PDF immediately (no polling needed with ESCL)
+        filename = f"scan_{job_id}.pdf"
+        save_path = f"{SAVE_FOLDER.rstrip('/')}/{filename}"
         
-        logger.info(f"Scan job {job_id} submitted, processing in background")
+        await client.download_pdf(next_doc_url, save_path)
+        
+        # Update job status
+        async with jobs_lock:
+            if job_id in jobs:
+                jobs[job_id]['status'] = 'Completed'
+                jobs[job_id]['saved_path'] = save_path
+        
+        logger.info(f"Scan job {job_id} completed, PDF saved to {save_path}")
+        
         return {
             "status": "success",
             "job_id": job_id,
-            "message": "Scan job submitted successfully"
+            "message": "Scan completed successfully",
+            "saved_path": save_path
         }
     
     except Exception as e:
-        logger.error(f"Failed to submit scan job: {e}")
+        logger.error(f"Failed to complete scan: {e}")
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "message": f"Failed to submit scan job: {str(e)}"}
+            content={"status": "error", "message": f"Failed to complete scan: {str(e)}"}
         )
 
 @app.get("/status/{job_id}")

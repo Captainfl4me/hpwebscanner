@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, AsyncMock
 
 def test_health_endpoint(client):
     """Test that health endpoint returns 200 and healthy status."""
-    from src.main import app
+    from main import app
     # Mock the httpx client's get method for health check
     mock_response = MagicMock()
     mock_response.status_code = 200

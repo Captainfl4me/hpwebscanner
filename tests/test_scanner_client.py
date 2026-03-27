@@ -7,7 +7,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from scanner_client import EWSClient
 
-EWS_NS = {'scan': 'http://www.hp.com/schemas/imaging/eses/2009/03/25/'}
+ESCL_NS = {
+    'pwg': 'http://www.pwg.org/schemas/2010/12/sm',
+    'scan': 'http://schemas.hp.com/imaging/escl/2011/05/03'
+}
 
 
 @pytest.fixture
@@ -30,43 +33,81 @@ class TestBuildScanJobXml:
         xml_str = client._build_scan_job_xml()
         root = ET.fromstring(xml_str)
         
-        assert root.tag == '{http://www.hp.com/schemas/imaging/eses/2009/03/25/}ScanJob'
-        settings = root.find('scan:ScanSettings', EWS_NS)
-        assert settings is not None
+        # Root should be pwg:ScanSettings
+        assert root.tag == '{http://www.pwg.org/schemas/2010/12/sm}ScanSettings'
         
-        color = settings.find('scan:ColorMode', EWS_NS)
-        assert color.text == "Color"
+        # Check pwg:Version
+        version = root.find('pwg:Version', ESCL_NS)
+        assert version is not None
+        assert version.text == "2.0"
         
-        res = settings.find('scan:Resolution', EWS_NS)
-        assert res.text == "200"
+        # Check pwg:ScanRegions
+        scan_regions = root.find('pwg:ScanRegions', ESCL_NS)
+        assert scan_regions is not None
+        scan_region = scan_regions.find('pwg:ScanRegion', ESCL_NS)
+        assert scan_region is not None
         
-        file_type = settings.find('scan:FileType', EWS_NS)
-        assert file_type.text == "PDF"
+        # Check dimensions (default A4 at 300 DPI)
+        height = scan_region.find('pwg:Height', ESCL_NS)
+        assert height is not None
+        # 297mm * 300dpi / 25.4 = 3507.87... (floor to 3507)
+        assert int(height.text) == 3507
         
-        file_format = settings.find('scan:FileFormat', EWS_NS)
-        assert file_format.text == "Adobe PDF"
+        width = scan_region.find('pwg:Width', ESCL_NS)
+        assert width is not None
+        # 210mm * 300dpi / 25.4 = 2480 pixels (approx)
+        assert int(width.text) == 2480
         
-        input_source = settings.find('scan:InputSource', EWS_NS)
-        assert input_source.text == "Flatbed"
+        units = scan_region.find('pwg:ContentRegionUnits', ESCL_NS)
+        assert units is not None
+        assert units.text == "escl:ThreeHundredthsOfInches"
+        
+        x_offset = scan_region.find('pwg:XOffset', ESCL_NS)
+        assert x_offset is not None
+        assert x_offset.text == "0"
+        
+        y_offset = scan_region.find('pwg:YOffset', ESCL_NS)
+        assert y_offset is not None
+        assert y_offset.text == "0"
+        
+        # Check pwg:InputSource
+        input_src = root.find('pwg:InputSource', ESCL_NS)
+        assert input_src is not None
+        assert input_src.text == "Platen"
+        
+        # Check scan:ColorMode (default RGB24)
+        color = root.find('scan:ColorMode', ESCL_NS)
+        assert color is not None
+        assert color.text == "RGB24"
     
     def test_custom_params(self):
         client = EWSClient("1.2.3.4")
         xml_str = client._build_scan_job_xml(
             color_mode="Grayscale",
-            resolution=300,
-            file_type="JPEG"
+            width_mm=215.9,  # 8.5 inches in mm
+            height_mm=279.4, # 11 inches in mm
+            dpi=200
         )
         root = ET.fromstring(xml_str)
-        settings = root.find('scan:ScanSettings', EWS_NS)
         
-        color = settings.find('scan:ColorMode', EWS_NS)
+        # Check dimensions for 200 DPI
+        scan_region = root.find('pwg:ScanRegions/pwg:ScanRegion', ESCL_NS)
+        assert scan_region is not None
+        
+        height = scan_region.find('pwg:Height', ESCL_NS)
+        assert height is not None
+        # 279.4mm * 200dpi / 25.4 = 2200 pixels (approx)
+        assert int(height.text) == 2200
+        
+        width = scan_region.find('pwg:Width', ESCL_NS)
+        assert width is not None
+        # 215.9mm * 200dpi / 25.4 = 1700 pixels (approx)
+        assert int(width.text) == 1700
+        
+        # Check color mode
+        color = root.find('scan:ColorMode', ESCL_NS)
+        assert color is not None
         assert color.text == "Grayscale"
-        
-        res = settings.find('scan:Resolution', EWS_NS)
-        assert res.text == "300"
-        
-        file_type = settings.find('scan:FileType', EWS_NS)
-        assert file_type.text == "JPEG"
 
 
 class TestSubmitScanJob:
@@ -74,38 +115,38 @@ class TestSubmitScanJob:
     async def test_success_with_location_header(self, ews_client, mock_httpx_client):
         mock_response = MagicMock()
         mock_response.status_code = 201
-        mock_response.headers = {'Location': 'http://192.168.1.100/Scan/Jobs/12345'}
+        mock_response.headers = {'Location': 'http://192.168.1.100/eSCL/ScanJobs/12345'}
         mock_response.text = ''
         mock_httpx_client.post = AsyncMock(return_value=mock_response)
         
         result = await ews_client.submit_scan_job()
         
         assert result['job_id'] == '12345'
-        assert result['job_url'] == 'http://192.168.1.100/Scan/Jobs/12345'
+        assert result['job_url'] == 'http://192.168.1.100/eSCL/ScanJobs/12345'
+        assert result['next_document_url'] == 'http://192.168.1.100/eSCL/ScanJobs/12345/NextDocument'
         assert result['status'] == 'Submitted'
         
         mock_httpx_client.post.assert_called_once()
         call_args = mock_httpx_client.post.call_args
         # Should use HTTPS base URL with eSCL endpoint
         assert call_args[0][0] == 'https://192.168.1.100/eSCL/ScanJobs'
-        assert 'Content-Type' in call_args[1]['headers']
+        assert call_args[1]['headers']['Content-Type'] == 'text/xml'
+        # Check that XML payload contains ESCL structure
+        xml_payload = call_args[1]['content']
+        assert 'xmlns:pwg' in xml_payload
+        assert 'xmlns:scan' in xml_payload
+        assert 'pwg:Version' in xml_payload or 'Version' in xml_payload
     
     @pytest.mark.asyncio
-    async def test_success_with_xml_body(self, ews_client, mock_httpx_client):
-        xml_body = '''<?xml version="1.0"?>
-        <scan:ScanJob xmlns:scan="http://www.hp.com/schemas/imaging/eses/2009/03/25/">
-            <scan:JobURL>http://192.168.1.100/Scan/Jobs/67890</scan:JobURL>
-        </scan:ScanJob>'''
+    async def test_missing_location_header(self, ews_client, mock_httpx_client):
         mock_response = MagicMock()
         mock_response.status_code = 201
         mock_response.headers = {}
-        mock_response.text = xml_body
+        mock_response.text = ''
         mock_httpx_client.post = AsyncMock(return_value=mock_response)
         
-        result = await ews_client.submit_scan_job()
-        
-        assert result['job_id'] == '67890'
-        assert result['job_url'] == 'http://192.168.1.100/Scan/Jobs/67890'
+        with pytest.raises(ValueError, match="No Location header"):
+            await ews_client.submit_scan_job()
     
     @pytest.mark.asyncio
     async def test_http_error(self, ews_client, mock_httpx_client):
@@ -115,101 +156,7 @@ class TestSubmitScanJob:
             await ews_client.submit_scan_job()
 
 
-class TestGetJobStatus:
-    @pytest.mark.asyncio
-    async def test_success(self, ews_client, mock_httpx_client):
-        xml_body = '''<?xml version="1.0"?>
-        <scan:ScanJob xmlns:scan="http://www.hp.com/schemas/imaging/eses/2009/03/25/">
-            <scan:JobState>Completed</scan:JobState>
-            <scan:BinaryURL>http://192.168.1.100/Scan/Binary/abcd</scan:BinaryURL>
-        </scan:ScanJob>'''
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = xml_body
-        mock_httpx_client.get = AsyncMock(return_value=mock_response)
-        
-        status = await ews_client.get_job_status('http://192.168.1.100/Scan/Jobs/123')
-        
-        assert status['state'] == 'Completed'
-        assert status['binary_url'] == 'http://192.168.1.100/Scan/Binary/abcd'
-    
-    @pytest.mark.asyncio
-    async def test_processing_state(self, ews_client, mock_httpx_client):
-        xml_body = '''<?xml version="1.0"?>
-        <scan:ScanJob xmlns:scan="http://www.hp.com/schemas/imaging/eses/2009/03/25/">
-            <scan:JobState>Processing</scan:JobState>
-        </scan:ScanJob>'''
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = xml_body
-        mock_httpx_client.get = AsyncMock(return_value=mock_response)
-        
-        status = await ews_client.get_job_status('http://192.168.1.100/Scan/Jobs/123')
-        
-        assert status['state'] == 'Processing'
-        assert status['binary_url'] is None
-    
-    @pytest.mark.asyncio
-    async def test_missing_elements(self, ews_client, mock_httpx_client):
-        xml_body = '''<?xml version="1.0"?>
-        <scan:ScanJob xmlns:scan="http://schemas.hp.com/scan">
-        </scan:ScanJob>'''
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = xml_body
-        mock_httpx_client.get = AsyncMock(return_value=mock_response)
-        
-        status = await ews_client.get_job_status('http://192.168.1.100/Scan/Jobs/123')
-        
-        assert status['state'] == 'Unknown'
-        assert status['binary_url'] is None
 
-
-class TestWaitForCompletion:
-    @pytest.mark.asyncio
-    async def test_success(self, ews_client, mock_httpx_client):
-        # First call returns Processing, second returns Completed
-        responses = [
-            {'state': 'Processing', 'binary_url': None},
-            {'state': 'Completed', 'binary_url': 'http://192.168.1.100/Scan/Binary/xyz'}
-        ]
-        
-        async def mock_get(url):
-            resp = MagicMock()
-            resp.status_code = 200
-            # Pop from the front
-            current = responses.pop(0)
-            binary_url = current['binary_url'] if current['binary_url'] else ""
-            resp.text = f'''<?xml version="1.0"?>
-            <scan:ScanJob xmlns:scan="http://www.hp.com/schemas/imaging/eses/2009/03/25/">
-                <scan:JobState>{current["state"]}</scan:JobState>
-                <scan:BinaryURL>{binary_url}</scan:BinaryURL>
-            </scan:ScanJob>'''
-            return resp
-        
-        mock_httpx_client.get = AsyncMock(side_effect=mock_get)
-        
-        status = await ews_client.wait_for_completion('http://192.168.1.100/Scan/Jobs/123', poll_interval=0.1)
-        
-        assert status['state'] == 'Completed'
-        assert status['binary_url'] == 'http://192.168.1.100/Scan/Binary/xyz'
-    
-    @pytest.mark.asyncio
-    async def test_timeout(self, ews_client, mock_httpx_client):
-        # Always return Processing
-        async def mock_get(url):
-            resp = MagicMock()
-            resp.status_code = 200
-            resp.text = '''<?xml version="1.0"?>
-            <scan:ScanJob xmlns:scan="http://schemas.hp.com/scan">
-                <scan:JobState>Processing</scan:JobState>
-            </scan:ScanJob>'''
-            return resp
-        
-        mock_httpx_client.get = AsyncMock(side_effect=mock_get)
-        
-        with pytest.raises(TimeoutError):
-            await ews_client.wait_for_completion('http://192.168.1.100/Scan/Jobs/123', poll_interval=0.1, max_polls=2)
 
 
 class TestDownloadPdf:

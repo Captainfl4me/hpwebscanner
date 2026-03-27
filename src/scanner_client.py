@@ -8,10 +8,13 @@ logger = logging.getLogger('hpwebscanner')
 
 
 class EWSClient:
-    """Client for HP scanner Embedded Web Server (EWS) protocol."""
+    """Client for HP scanner ESCL (eSCL) protocol."""
     
-    # eSCL namespace (HP implementation)
-    EWS_NS = {'scan': 'http://www.hp.com/schemas/imaging/eses/2009/03/25/'}
+    # ESCL/PWG namespaces (based on working example)
+    ESCL_NS = {
+        'pwg': 'http://www.pwg.org/schemas/2010/12/sm',
+        'scan': 'http://schemas.hp.com/imaging/escl/2011/05/03'
+    }
     
     def __init__(self, scanner_ip: str, timeout: int = 30):
         self.scanner_ip = scanner_ip
@@ -20,6 +23,10 @@ class EWSClient:
         self.api_base = f"{self.base_url}/eSCL"
         self.timeout = timeout
         self.client = httpx.AsyncClient(timeout=timeout, follow_redirects=True, verify=False)
+        # Default scan parameters
+        self.default_dpi = 300
+        self.default_width_mm = 210  # A4 width
+        self.default_height_mm = 297  # A4 height
     
     async def __aenter__(self):
         return self
@@ -32,47 +39,66 @@ class EWSClient:
         await self.client.aclose()
     
     def _build_scan_job_xml(self, 
-                           color_mode: str = "Color",
-                           resolution: int = 200,
-                           file_type: str = "PDF") -> str:
-        """Build the XML payload for scan job submission."""
-        ns = self.EWS_NS['scan']
+                           color_mode: str = "RGB24",
+                           input_source: str = "Platen",
+                           width_mm: int = 210,
+                           height_mm: int = 297,
+                           dpi: int = 300) -> str:
+        """Build the XML payload for scan job submission using ESCL/PWG schema."""
+        # Calculate pixel dimensions
+        width_px = int(width_mm * dpi / 25.4)
+        height_px = int(height_mm * dpi / 25.4)
         
-        # Use Clark notation for namespaced tags
-        root = ET.Element(f"{{{ns}}}ScanJob")
+        # Create root element with pwg namespace
+        pwg_ns = self.ESCL_NS['pwg']
+        scan_ns = self.ESCL_NS['scan']
+        root = ET.Element(f"{{{pwg_ns}}}ScanSettings")
         
-        settings = ET.SubElement(root, f"{{{ns}}}ScanSettings")
+        # Add version
+        version = ET.SubElement(root, f"{{{pwg_ns}}}Version")
+        version.text = "2.0"
         
-        color = ET.SubElement(settings, f"{{{ns}}}ColorMode")
+        # Add scan regions
+        scan_regions = ET.SubElement(root, f"{{{pwg_ns}}}ScanRegions")
+        scan_region = ET.SubElement(scan_regions, f"{{{pwg_ns}}}ScanRegion")
+        
+        height_elem = ET.SubElement(scan_region, f"{{{pwg_ns}}}Height")
+        height_elem.text = str(height_px)
+        
+        width_elem = ET.SubElement(scan_region, f"{{{pwg_ns}}}Width")
+        width_elem.text = str(width_px)
+        
+        units = ET.SubElement(scan_region, f"{{{pwg_ns}}}ContentRegionUnits")
+        units.text = "escl:ThreeHundredthsOfInches"
+        
+        x_offset = ET.SubElement(scan_region, f"{{{pwg_ns}}}XOffset")
+        x_offset.text = "0"
+        
+        y_offset = ET.SubElement(scan_region, f"{{{pwg_ns}}}YOffset")
+        y_offset.text = "0"
+        
+        # Add input source
+        input_src = ET.SubElement(root, f"{{{pwg_ns}}}InputSource")
+        input_src.text = input_source
+        
+        # Add color mode using scan namespace
+        color = ET.SubElement(root, f"{{{scan_ns}}}ColorMode")
         color.text = color_mode
         
-        res = ET.SubElement(settings, f"{{{ns}}}Resolution")
-        res.text = str(resolution)
-        
-        file_type_elem = ET.SubElement(settings, f"{{{ns}}}FileType")
-        file_type_elem.text = file_type
-        
-        # Add basic file format settings
-        file_format = ET.SubElement(settings, f"{{{ns}}}FileFormat")
-        file_format.text = "Adobe PDF"
-        
-        # Input source - flatbed by default
-        input_source = ET.SubElement(settings, f"{{{ns}}}InputSource")
-        input_source.text = "Flatbed"
-        
-        # Register namespace to get consistent prefix
-        ET.register_namespace('scan', ns)
+        # Register namespaces
+        ET.register_namespace('pwg', pwg_ns)
+        ET.register_namespace('scan', scan_ns)
         
         return ET.tostring(root, encoding='unicode')
     
     async def submit_scan_job(self) -> Dict[str, Any]:
-        """Submit a scan job to the scanner."""
+        """Submit a scan job to the scanner using ESCL protocol."""
         url = f"{self.api_base}/ScanJobs"
         xml_payload = self._build_scan_job_xml()
         
         headers = {
-            'Content-Type': 'application/xml',
-            'Accept': 'application/xml'
+            'Content-Type': 'text/xml',
+            'Accept': 'text/xml'
         }
         
         try:
@@ -80,34 +106,24 @@ class EWSClient:
             response = await self.client.post(url, content=xml_payload, headers=headers)
             response.raise_for_status()
             
-            # Parse the response XML
-            response_xml = response.text
-            
-            # Extract job URL from Location header or from response body
+            # Extract job URL from Location header
             job_url = response.headers.get('Location')
             if not job_url:
-                # Parse XML to find JobURL or JobId
-                root = ET.fromstring(response_xml)
-                job_url_elem = root.find('.//scan:JobURL', self.EWS_NS)
-                if job_url_elem is not None:
-                    job_url = job_url_elem.text
-                else:
-                    # Try to find JobId and construct URL
-                    job_id_elem = root.find('.//scan:JobId', self.EWS_NS)
-                    if job_id_elem is not None:
-                        job_id = job_id_elem.text
-                        job_url = f"{self.api_base}/jobs/{job_id}"
+                raise ValueError("No Location header returned from scan job submission")
             
-            if not job_url:
-                raise ValueError("No job URL returned from scan job submission")
+            # Construct next document URL by appending '/NextDocument'
+            # As per example-scan.py: urljoin(resp.headers['Location'] + '/', 'NextDocument')
+            from urllib.parse import urljoin
+            next_doc_url = urljoin(job_url.rstrip('/') + '/', 'NextDocument')
             
-            # Extract job ID from the URL (last part after /)
+            # Extract job ID from the job URL (last part after /)
             job_id = job_url.rstrip('/').split('/')[-1]
             
-            logger.info(f"Scan job submitted successfully - Job ID: {job_id}, Job URL: {job_url}")
+            logger.info(f"Scan job submitted successfully - Job ID: {job_id}, NextDoc URL: {next_doc_url}")
             return {
                 'job_id': job_id,
                 'job_url': job_url,
+                'next_document_url': next_doc_url,
                 'status': 'Submitted'
             }
             
@@ -118,56 +134,7 @@ class EWSClient:
             logger.error(f"Error submitting scan job: {e}")
             raise
     
-    async def get_job_status(self, job_url: str) -> Dict[str, Any]:
-        """Poll the job status from the job URL."""
-        try:
-            logger.debug(f"Polling job status from {job_url}")
-            response = await self.client.get(job_url)
-            response.raise_for_status()
-            
-            # Parse the response XML
-            root = ET.fromstring(response.text)
-            
-            # Extract job state
-            state_elem = root.find('.//scan:JobState', self.EWS_NS)
-            state = state_elem.text if state_elem is not None else "Unknown"
-            
-            # Check if PDF is available
-            binary_url_elem = root.find('.//scan:BinaryURL', self.EWS_NS)
-            binary_url = binary_url_elem.text if binary_url_elem is not None else None
-            
-            result = {
-                'state': state,
-                'binary_url': binary_url
-            }
-            
-            logger.debug(f"Job status: {state}")
-            return result
-            
-        except httpx.HTTPError as e:
-            logger.error(f"HTTP error getting job status: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Error getting job status: {e}")
-            raise
-    
-    async def wait_for_completion(self, job_url: str, 
-                                  poll_interval: int = 2, 
-                                  max_polls: int = 300) -> Dict[str, Any]:
-        """Poll job until completion or timeout."""
-        for i in range(max_polls):
-            status = await self.get_job_status(job_url)
-            
-            # EWS states: Submitted, Processing, Completed, Cancelled, Error
-            if status['state'] in ['Completed', 'Cancelled', 'Error']:
-                logger.info(f"Job finished with state: {status['state']}")
-                return status
-            
-            if i < max_polls - 1:
-                await asyncio.sleep(poll_interval)
-        
-        raise TimeoutError(f"Job did not complete within {max_polls * poll_interval} seconds")
-    
+
     async def download_pdf(self, pdf_url: str, destination_path: str) -> None:
         """Download the PDF from the BinaryURL and save to file."""
         try:
@@ -196,11 +163,12 @@ class EWSClient:
                    filename: Optional[str] = None,
                    wait_for_completion: bool = True,
                    **scan_kwargs) -> Dict[str, Any]:
-        """Complete scan workflow: submit job, wait (optional), and save PDF."""
+        """Complete scan workflow: submit job and immediately download result (ESCL protocol)."""
         # Submit scan job
         job_info = await self.submit_scan_job()
         job_id = job_info['job_id']
         job_url = job_info['job_url']
+        next_doc_url = job_info['next_document_url']
         
         result = {
             'job_id': job_id,
@@ -209,22 +177,16 @@ class EWSClient:
         }
         
         if wait_for_completion:
-            # Wait for job to complete
-            final_status = await self.wait_for_completion(job_url)
-            result['final_state'] = final_status['state']
+            # With ESCL, the result is available immediately after submission
+            # Generate filename if not provided
+            if not filename:
+                filename = f"scan_{job_id}.pdf"
             
-            if final_status['state'] == 'Completed' and final_status.get('binary_url'):
-                # Generate filename if not provided
-                if not filename:
-                    filename = f"scan_{job_id}.pdf"
-                
-                save_path = f"{save_folder.rstrip('/')}/{filename}"
-                
-                # Download PDF
-                await self.download_pdf(final_status['binary_url'], save_path)
-                result['saved_path'] = save_path
-                result['status'] = 'Completed'
-            else:
-                result['status'] = final_status['state']
+            save_path = f"{save_folder.rstrip('/')}/{filename}"
+            
+            # Download directly from NextDocument URL
+            await self.download_pdf(next_doc_url, save_path)
+            result['saved_path'] = save_path
+            result['status'] = 'Completed'
         
         return result
