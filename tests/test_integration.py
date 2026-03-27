@@ -1,19 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock
-import os
-import sys
-
-# Ensure src is in path (should be from conftest but ensure)
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-src_path = os.path.join(project_root, 'src')
-if src_path not in sys.path:
-    sys.path.insert(0, src_path)
-
-# Ensure environment variables are set before importing app
-os.environ.setdefault("SCANNER_IP", "192.168.1.100")
-os.environ.setdefault("SAVE_FOLDER", "/tmp/scans")
-os.environ.setdefault("ALLOWED_IP", "")
 
 from main import app, jobs
 
