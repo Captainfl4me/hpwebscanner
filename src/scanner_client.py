@@ -49,10 +49,10 @@ class EWSClient:
         width_px = int(width_mm * dpi / 25.4)
         height_px = int(height_mm * dpi / 25.4)
         
-        # Create root element with pwg namespace
+        # Create root element with scan namespace (per ESCL spec)
         pwg_ns = self.ESCL_NS['pwg']
         scan_ns = self.ESCL_NS['scan']
-        root = ET.Element(f"{{{pwg_ns}}}ScanSettings")
+        root = ET.Element(f"{{{scan_ns}}}ScanSettings")
         
         # Add version
         version = ET.SubElement(root, f"{{{pwg_ns}}}Version")
@@ -95,6 +95,7 @@ class EWSClient:
         """Submit a scan job to the scanner using ESCL protocol."""
         url = f"{self.api_base}/ScanJobs"
         xml_payload = self._build_scan_job_xml()
+        logger.debug("ESCL XML payload: %s", xml_payload)
         
         headers = {
             'Content-Type': 'text/xml',
