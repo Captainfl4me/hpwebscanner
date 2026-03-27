@@ -181,7 +181,7 @@ class EWSClient:
             # With ESCL, the result is available immediately after submission
             # Generate filename if not provided
             if not filename:
-                filename = f"scan_{job_id}.pdf"
+                filename = f"scan_{job_id}.jpg"
             
             save_path = f"{save_folder.rstrip('/')}/{filename}"
             

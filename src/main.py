@@ -12,7 +12,7 @@ from scanner_client import EWSClient
 
 # Environmental variables configuration
 SCANNER_IP = os.getenv("SCANNER_IP")
-SAVE_FOLDER = os.getenv("SAVE_FOLDER", "/scans")
+SAVE_FOLDER = os.getenv("SAVE_FOLDER", "./")
 ALLOWED_IP = os.getenv("ALLOWED_IP", "127.0.0.1")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
@@ -126,7 +126,7 @@ async def trigger_scan():
             }
         
         # Download the PDF immediately (no polling needed with ESCL)
-        filename = f"scan_{job_id}.pdf"
+        filename = f"scan_{job_id}.jpg"
         save_path = f"{SAVE_FOLDER.rstrip('/')}/{filename}"
         
         await client.download_pdf(next_doc_url, save_path)
