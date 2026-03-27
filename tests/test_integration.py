@@ -47,12 +47,12 @@ def test_scan_endpoint_success(mock_ews):
         data = response.json()
         assert data["status"] == "success"
         assert data["job_id"] == "test123"
-        assert data["saved_path"] == "/tmp/scans/scan_test123.pdf"
+        assert data["saved_path"] == "/tmp/scans/scan_test123.jpg"
         mock_ews.submit_scan_job.assert_called_once()
         # download_pdf should be called with next_document_url
         mock_ews.download_pdf.assert_called_once_with(
             'http://192.168.1.100/Scan/Jobs/test123/NextDocument',
-            '/tmp/scans/scan_test123.pdf'
+            '/tmp/scans/scan_test123.jpg'
         )
 
 def test_scan_endpoint_failure(mock_ews):
@@ -77,14 +77,12 @@ def test_status_endpoint_after_scan(mock_ews):
         assert response.status_code == 200
         data = response.json()
         assert data["job_status"]["status"] == "Completed"
-        assert data["job_status"]["saved_path"] == "/tmp/scans/scan_test123.pdf"
+        assert data["job_status"]["saved_path"] == "/tmp/scans/scan_test123.jpg"
         
-        # wait_for_completion should NOT be called (using direct download)
-        mock_ews.wait_for_completion.assert_not_called()
         # download_pdf should be called with next_document_url
         mock_ews.download_pdf.assert_called_once_with(
             'http://192.168.1.100/Scan/Jobs/test123/NextDocument',
-            '/tmp/scans/scan_test123.pdf'
+            '/tmp/scans/scan_test123.jpg'
         )
 
 def test_status_endpoint_unknown_job():

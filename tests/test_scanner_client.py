@@ -33,7 +33,7 @@ class TestBuildScanJobXml:
         root = ET.fromstring(xml_str)
         
         # Root should be pwg:ScanSettings
-        assert root.tag == '{http://www.pwg.org/schemas/2010/12/sm}ScanSettings'
+        assert root.tag == f"{{{ESCL_NS['scan']}}}ScanSettings"
         
         # Check pwg:Version
         version = root.find('pwg:Version', ESCL_NS)
