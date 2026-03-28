@@ -36,4 +36,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: captainfl4me/hpwebscan:latest
+          tags: ghcr.io/${{ toLower(github.repository) }}:latest
