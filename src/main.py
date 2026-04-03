@@ -78,31 +78,40 @@ app.add_middleware(OriginValidationMiddleware, allowed_ip=ALLOWED_IP)
 
 @app.get("/health")
 async def health_check():
-    logger.info("Health check endpoint accessed")
-    try:
-        # Test basic connectivity to scanner by checking capabilities endpoint
-        client = app.state.ews_client
-        capabilities_url = f"{client.base_url}/eSCL/ScannerCapabilities"
-        response = await client.client.get(capabilities_url, timeout=5)
-        if response.status_code < 500:  # Accept any non-server error
+        logger.info("Health check endpoint accessed")
+        try:
+            # Test basic connectivity to scanner by checking capabilities endpoint
+            client = app.state.ews_client
+            capabilities_url = f"{client.base_url}/eSCL/ScannerCapabilities"
+            response = await client.client.get(capabilities_url, timeout=5)
+            status_code = response.status_code
+            
+            # Proper HTTP status code classification
+            if 200 <= status_code < 300:
+                return {
+                    "status": "healthy",
+                    "message": "Server and scanner connection OK",
+                    "scanner_status_code": status_code
+                }
+            elif 300 <= status_code < 400:
+                return {
+                    "status": "degraded",
+                    "message": "Server running but scanner redirecting",
+                    "scanner_status_code": status_code
+                }
+            else:  # 4xx or 5xx
+                return {
+                    "status": "unhealthy",
+                    "message": "Server running but scanner error",
+                    "scanner_status_code": status_code
+                }
+        except Exception as e:
+            logger.warning(f"Health check failed to reach scanner: {e}")
             return {
-                "status": "healthy",
-                "message": "Server and scanner connection OK",
-                "scanner_status_code": response.status_code
+                "status": "unhealthy",
+                "message": "Server running but scanner unreachable",
+                "error": str(e)
             }
-        else:
-            return {
-                "status": "degraded",
-                "message": "Server running but scanner error",
-                "scanner_status_code": response.status_code
-            }
-    except Exception as e:
-        logger.warning(f"Health check failed to reach scanner: {e}")
-        return {
-            "status": "unhealthy",
-            "message": "Server running but scanner unreachable",
-            "error": str(e)
-        }
 
 @app.post("/scan")
 async def trigger_scan():
