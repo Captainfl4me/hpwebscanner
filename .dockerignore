@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+venv3/
+.venv3/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.hypothesis/
+tox.ini
+.venv/
+
+# Testing
+tests/
+test/
+pytest_cache/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+.gitmodules
+.gitattributes
+
+# Development
+README.md
+AGENTS.md
+docs/
+Makefile
+*.ini
+*.cfg
+docker-compose*
+.dockerignore
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Local config
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
