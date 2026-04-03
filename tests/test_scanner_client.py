@@ -15,7 +15,9 @@ ESCL_NS = {
 @pytest.fixture
 def mock_httpx_client():
     """Create a mock httpx.AsyncClient."""
-    return MagicMock()
+    mock = MagicMock()
+    mock.aclose = AsyncMock()
+    return mock
 
 
 @pytest.fixture
@@ -381,3 +383,51 @@ class TestScan:
         
         with pytest.raises(ValueError, match="Submit failed"):
             await ews_client.scan('/tmp/scans', wait_for_completion=True)
+
+
+class TestLifecycle:
+    """Tests for EWSClient lifecycle (context manager and close)."""
+    
+    @pytest.mark.asyncio
+    async def test_aenter_returns_self(self, ews_client):
+        """Test that __aenter__ returns the client instance."""
+        result = await ews_client.__aenter__()
+        assert result is ews_client
+    
+    @pytest.mark.asyncio
+    async def test_aexit_calls_close(self, ews_client, mock_httpx_client):
+        """Test that __aexit__ calls close()."""
+        # Spy on the close method
+        original_close = ews_client.close
+        close_spy = AsyncMock(side_effect=original_close)
+        ews_client.close = close_spy
+        
+        await ews_client.__aexit__(None, None, None)
+        
+        close_spy.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_close_calls_httpx_client_aclose(self, ews_client, mock_httpx_client):
+        """Test that close() calls aclose on the httpx client."""
+        # The httpx_client is an AsyncMock; we can check if aclose was called
+        await ews_client.close()
+        mock_httpx_client.aclose.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_context_manager_usage(self, mock_httpx_client, monkeypatch):
+        """Test using EWSClient as async context manager."""
+        from scanner_client import EWSClient
+        
+        # Patch the EWSClient's httpx client usage to use our mock
+        # The EWSClient creates its own httpx.AsyncClient in __init__,
+        # so we need to replace that client's aclose method after creation.
+        # Alternatively, we can patch httpx.AsyncClient to return our mock.
+        monkeypatch.setattr("httpx.AsyncClient", lambda *args, **kwargs: mock_httpx_client)
+        
+        async with EWSClient("192.168.1.100") as client:
+            assert client is not None
+            assert isinstance(client, EWSClient)
+            assert client.base_url == "https://192.168.1.100"
+        
+        # After exiting, httpx client should be closed
+        mock_httpx_client.aclose.assert_called_once()
