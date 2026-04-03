@@ -21,7 +21,7 @@ def mock_ews(monkeypatch):
     mock_response.status_code = 200
     mock.client = AsyncMock()
     mock.client.get = AsyncMock(return_value=mock_response)
-    monkeypatch.setattr('main.EWSClient', lambda ip: mock)
+    monkeypatch.setattr('main.EWSClient', lambda ip, **kwargs: mock)
     return mock
 
 @pytest.fixture(autouse=True)

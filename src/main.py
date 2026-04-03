@@ -15,6 +15,7 @@ SCANNER_IP = os.getenv("SCANNER_IP")
 SAVE_FOLDER = os.getenv("SAVE_FOLDER", "./")
 ALLOWED_IP = os.getenv("ALLOWED_IP", "127.0.0.1")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
 # Check required environment variables
 if not SCANNER_IP:
@@ -58,7 +59,7 @@ jobs_lock = asyncio.Lock()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    app.state.ews_client = EWSClient(SCANNER_IP)
+    app.state.ews_client = EWSClient(SCANNER_IP, verify_ssl=SSL_VERIFY)
     logger.info("EWS client initialized")
     yield
     # Shutdown

@@ -16,13 +16,14 @@ class EWSClient:
         'scan': 'http://schemas.hp.com/imaging/escl/2011/05/03'
     }
     
-    def __init__(self, scanner_ip: str, timeout: int = 30):
+    def __init__(self, scanner_ip: str, timeout: int = 30, verify_ssl: bool = True):
         self.scanner_ip = scanner_ip
         # Use HTTPS to avoid redirects; fallback to HTTP if needed
         self.base_url = f"https://{scanner_ip}"
         self.api_base = f"{self.base_url}/eSCL"
         self.timeout = timeout
-        self.client = httpx.AsyncClient(timeout=timeout, follow_redirects=True, verify=False)
+        self.verify_ssl = verify_ssl
+        self.client = httpx.AsyncClient(timeout=timeout, follow_redirects=True, verify=verify_ssl)
         # Default scan parameters
         self.default_dpi = 300
         self.default_width_mm = 210  # A4 width
