@@ -16,6 +16,7 @@ SAVE_FOLDER = os.getenv("SAVE_FOLDER", "./")
 ALLOWED_IP = os.getenv("ALLOWED_IP", "127.0.0.1")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
+MAX_JOBS = int(os.getenv("MAX_JOBS", "100"))
 
 # Check required environment variables
 if not SCANNER_IP:
@@ -51,6 +52,8 @@ logger.info(f"Configuration loaded - SCANNER_IP: {SCANNER_IP}")
 logger.info(f"SAVE_FOLDER: {SAVE_FOLDER}")
 logger.info(f"ALLOWED_IP: {ALLOWED_IP}")
 logger.info(f"LOG_LEVEL: {LOG_LEVEL}")
+logger.info(f"SSL_VERIFY: {SSL_VERIFY}")
+logger.info(f"MAX_JOBS: {MAX_JOBS}")
 
 # Job storage and lock (kept for status tracking, though scans are immediate)
 jobs: Dict[str, Dict[str, Any]] = {}
@@ -142,9 +145,16 @@ async def trigger_scan():
         job_id = job_info['job_id']
         job_url = job_info['job_url']
         next_doc_url = job_info['next_document_url']
-        
+         
         # Store initial job info
         async with jobs_lock:
+            # Enforce MAX_JOBS limit by removing oldest job if needed
+            if len(jobs) >= MAX_JOBS:
+                # Pop the first (oldest) job
+                oldest_job_id = next(iter(jobs))
+                jobs.pop(oldest_job_id)
+                logger.debug(f"Removed oldest job {oldest_job_id} to enforce MAX_JOBS limit")
+            
             jobs[job_id] = {
                 'job_url': job_url,
                 'status': 'Downloading',
