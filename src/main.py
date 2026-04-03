@@ -98,6 +98,14 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
         if self.is_open:
             return await call_next(request)
         
+        # Handle missing client information
+        if request.client is None:
+            logger.warning("Blocked request: no client IP available")
+            return JSONResponse(
+                status_code=403,
+                content={"status": "error", "message": "Access denied: cannot determine client IP"}
+            )
+        
         client_ip = request.client.host
         if client_ip != self.allowed_ip:
             logger.warning(f"Blocked request from unauthorized IP: {client_ip}")

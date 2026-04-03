@@ -45,3 +45,81 @@ def test_middleware_open_all():
     
     response = client.get("/test")
     assert response.status_code == 200
+
+@pytest.mark.asyncio
+async def test_middleware_none_client_host():
+    """Test that when request.client is None, request is blocked."""
+    from starlette.requests import Request
+    from starlette.responses import Response
+    
+    app = FastAPI()
+    middleware = OriginValidationMiddleware(app, allowed_ip="192.168.1.1")
+    
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/test",
+        "headers": [],
+        "query_string": b"",
+        "server": ("testserver", 80),
+        "client": None,
+    }
+    request = Request(scope)
+    
+    async def dummy_call_next(request):
+        return Response("OK", status_code=200)
+    
+    response = await middleware.dispatch(request, dummy_call_next)
+    assert response.status_code == 403
+
+@pytest.mark.asyncio
+async def test_middleware_ipv6_address():
+    """Test that IPv6 addresses are correctly matched."""
+    from starlette.requests import Request
+    from starlette.responses import Response
+    
+    app = FastAPI()
+    middleware = OriginValidationMiddleware(app, allowed_ip="::1")
+    
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/test",
+        "headers": [],
+        "query_string": b"",
+        "server": ("testserver", 80),
+        "client": ("::1", 12345),  # 2-tuple (host, port)
+    }
+    request = Request(scope)
+    
+    async def dummy_call_next(request):
+        return Response("OK", status_code=200)
+    
+    response = await middleware.dispatch(request, dummy_call_next)
+    assert response.status_code == 200
+
+@pytest.mark.asyncio
+async def test_middleware_ipv6_blocked_when_different():
+    """Test that different IPv6 address is blocked."""
+    from starlette.requests import Request
+    from starlette.responses import Response
+    
+    app = FastAPI()
+    middleware = OriginValidationMiddleware(app, allowed_ip="::1")
+    
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/test",
+        "headers": [],
+        "query_string": b"",
+        "server": ("testserver", 80),
+        "client": ("::2", 12345),  # Different IPv6, 2-tuple
+    }
+    request = Request(scope)
+    
+    async def dummy_call_next(request):
+        return Response("OK", status_code=200)
+    
+    response = await middleware.dispatch(request, dummy_call_next)
+    assert response.status_code == 403
