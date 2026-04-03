@@ -431,3 +431,97 @@ class TestLifecycle:
         
         # After exiting, httpx client should be closed
         mock_httpx_client.aclose.assert_called_once()
+
+
+class TestBuildScanJobXmlEdgeCases:
+    """Edge case tests for _build_scan_job_xml() method."""
+    
+    def test_zero_dimensions(self):
+        """Test that zero width/height produces 0 pixel dimensions."""
+        client = EWSClient("1.2.3.4")
+        xml_str = client._build_scan_job_xml(width_mm=0, height_mm=0, dpi=300)
+        root = ET.fromstring(xml_str)
+        scan_region = root.find('pwg:ScanRegions/pwg:ScanRegion', ESCL_NS)
+        assert scan_region is not None
+        width = scan_region.find('pwg:Width', ESCL_NS).text
+        height = scan_region.find('pwg:Height', ESCL_NS).text
+        # 0 mm * 300 dpi / 25.4 = 0 pixels
+        assert int(width) == 0
+        assert int(height) == 0
+    
+    def test_negative_dimensions(self):
+        """Test that negative dimensions produce negative pixel dimensions (no special handling)."""
+        client = EWSClient("1.2.3.4")
+        # Negative values will result in negative pixels (which might be invalid but tested)
+        xml_str = client._build_scan_job_xml(width_mm=-100, height_mm=-50, dpi=300)
+        root = ET.fromstring(xml_str)
+        scan_region = root.find('pwg:ScanRegions/pwg:ScanRegion', ESCL_NS)
+        assert scan_region is not None
+        width = scan_region.find('pwg:Width', ESCL_NS).text
+        height = scan_region.find('pwg:Height', ESCL_NS).text
+        # -100mm * 300 / 25.4 ≈ -1181, -50mm * 300 / 25.4 ≈ -590
+        assert int(width) == -1181
+        assert int(height) == -590
+    
+    def test_very_large_dimensions(self):
+        """Test that very large dimensions produce large pixel values without overflow."""
+        client = EWSClient("1.2.3.4")
+        xml_str = client._build_scan_job_xml(width_mm=10000, height_mm=10000, dpi=1200)
+        root = ET.fromstring(xml_str)
+        scan_region = root.find('pwg:ScanRegions/pwg:ScanRegion', ESCL_NS)
+        assert scan_region is not None
+        width = int(scan_region.find('pwg:Width', ESCL_NS).text)
+        height = int(scan_region.find('pwg:Height', ESCL_NS).text)
+        # 10000mm * 1200dpi / 25.4 = 472440 approx
+        assert width == 472440
+        assert height == 472440
+    
+    def test_unusual_color_mode(self):
+        """Test that unusual color_mode values are accepted and placed in XML."""
+        client = EWSClient("1.2.3.4")
+        # Non-standard but should be passed through
+        unusual_modes = ["RGB48", "BW", "Gray"]
+        for mode in unusual_modes:
+            xml_str = client._build_scan_job_xml(color_mode=mode)
+            root = ET.fromstring(xml_str)
+            color = root.find('scan:ColorMode', ESCL_NS)
+            assert color is not None
+            assert color.text == mode
+    
+    def test_unusual_input_source(self):
+        """Test that unusual input_source values are accepted and placed in XML."""
+        client = EWSClient("1.2.3.4")
+        # Non-default sources (ADF, Auto, Flatbed) should be passed through
+        unusual_sources = ["ADF", "Auto", "Flatbed"]
+        for src in unusual_sources:
+            xml_str = client._build_scan_job_xml(input_source=src)
+            root = ET.fromstring(xml_str)
+            input_elem = root.find('pwg:InputSource', ESCL_NS)
+            assert input_elem is not None
+            assert input_elem.text == src
+    
+    def test_high_dpi(self):
+        """Test that high DPI values produce large pixel counts."""
+        client = EWSClient("1.2.3.4")
+        xml_str = client._build_scan_job_xml(dpi=2400)
+        root = ET.fromstring(xml_str)
+        scan_region = root.find('pwg:ScanRegions/pwg:ScanRegion', ESCL_NS)
+        width = int(scan_region.find('pwg:Width', ESCL_NS).text)
+        height = int(scan_region.find('pwg:Height', ESCL_NS).text)
+        # 210mm * 2400dpi / 25.4 = 19842 (floor)
+        # 297mm * 2400dpi / 25.4 = 28062 (floor)
+        assert width == 19842
+        assert height == 28062
+    
+    def test_fractional_dimensions(self):
+        """Test that fractional mm values are handled correctly."""
+        client = EWSClient("1.2.3.4")
+        # 8.5 inches = 215.9mm exactly, 11 inches = 279.4mm
+        xml_str = client._build_scan_job_xml(width_mm=215.9, height_mm=279.4, dpi=200)
+        root = ET.fromstring(xml_str)
+        scan_region = root.find('pwg:ScanRegions/pwg:ScanRegion', ESCL_NS)
+        width = int(scan_region.find('pwg:Width', ESCL_NS).text)
+        height = int(scan_region.find('pwg:Height', ESCL_NS).text)
+        # 215.9mm * 200 / 25.4 = 1700.0 exactly, 279.4mm * 200 / 25.4 = 2200.0 exactly
+        assert width == 1700
+        assert height == 2200
