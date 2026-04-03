@@ -29,6 +29,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger('hpwebscanner')
 
+# Validate SAVE_FOLDER exists and is writable
+try:
+    # Expand user home directory if needed
+    save_folder_path = os.path.expanduser(SAVE_FOLDER)
+    # Create folder if it doesn't exist
+    if not os.path.exists(save_folder_path):
+        logger.info(f"SAVE_FOLDER does not exist, creating: {save_folder_path}")
+        os.makedirs(save_folder_path, exist_ok=True)
+    # Check writability
+    if not os.access(save_folder_path, os.W_OK):
+        raise PermissionError(f"SAVE_FOLDER is not writable: {save_folder_path}")
+    logger.info(f"SAVE_FOLDER validated: {save_folder_path}")
+except Exception as e:
+    logger.error(f"Failed to validate SAVE_FOLDER '{SAVE_FOLDER}': {e}")
+    sys.exit(1)
+
 # Log configuration at startup
 logger.info(f"Configuration loaded - SCANNER_IP: {SCANNER_IP}")
 logger.info(f"SAVE_FOLDER: {SAVE_FOLDER}")
