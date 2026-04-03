@@ -16,7 +16,14 @@ SAVE_FOLDER = os.getenv("SAVE_FOLDER", "./")
 ALLOWED_IP = os.getenv("ALLOWED_IP", "127.0.0.1")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
-MAX_JOBS = int(os.getenv("MAX_JOBS", "100"))
+
+# Validate and parse MAX_JOBS
+try:
+    MAX_JOBS = int(os.getenv("MAX_JOBS", "100"))
+except ValueError:
+    logger = logging.getLogger('hpwebscanner')
+    logger.error("MAX_JOBS environment variable must be an integer.")
+    sys.exit(1)
 
 # Check required environment variables
 if not SCANNER_IP:
@@ -24,17 +31,26 @@ if not SCANNER_IP:
     logger.error("SCANNER_IP environment variable is required but not provided.")
     sys.exit(1)
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure logging with validation of LOG_LEVEL
+try:
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+except AttributeError:
+    # LOG_LEVEL is invalid
+    logger = logging.getLogger('hpwebscanner')
+    logger.error(f"Invalid LOG_LEVEL: {LOG_LEVEL}. Must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL.")
+    sys.exit(1)
 logger = logging.getLogger('hpwebscanner')
 
 # Validate SAVE_FOLDER exists and is writable
 try:
     # Expand user home directory if needed
     save_folder_path = os.path.expanduser(SAVE_FOLDER)
+    # Check if SAVE_FOLDER exists and is a file (not directory)
+    if os.path.exists(save_folder_path) and not os.path.isdir(save_folder_path):
+        raise ValueError(f"SAVE_FOLDER exists but is not a directory: {save_folder_path}")
     # Create folder if it doesn't exist
     if not os.path.exists(save_folder_path):
         logger.info(f"SAVE_FOLDER does not exist, creating: {save_folder_path}")
