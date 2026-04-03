@@ -94,6 +94,25 @@ def test_status_endpoint_unknown_job():
         assert data["status"] == "error"
         assert "not found" in data["message"]
 
+def test_scan_endpoint_download_failure(mock_ews):
+    """Test that when image download fails after job submission, returns 500 and job remains in incomplete state."""
+    # Override mock_ews.download_image to raise an exception
+    mock_ews.download_image = AsyncMock(side_effect=Exception("Download failed"))
+    
+    with TestClient(app) as client:
+        response = client.post("/scan")
+        assert response.status_code == 500
+        data = response.json()
+        assert data["status"] == "error"
+        assert "Failed to complete scan" in data["message"]
+    
+    # Job was submitted and added before download attempt, so it should exist in jobs dict
+    # Mock returns job_id 'test123' by default
+    assert 'test123' in jobs
+    # Job status should still be "Downloading" since download never completed
+    assert jobs['test123']['status'] == 'Downloading'
+    assert jobs['test123']['saved_path'] is None
+
 def test_max_jobs_eviction_removes_oldest(monkeypatch):
     """Test that when jobs count reaches MAX_JOBS, the oldest job is evicted before adding a new one."""
     import main
