@@ -158,7 +158,7 @@ class TestSubmitScanJob:
 
 
 
-class TestDownloadPdf:
+class TestDownloadImage:
     @pytest.mark.asyncio
     async def test_success(self, ews_client, mock_httpx_client):
         pdf_content = b"%PDF-1.4 test content"
@@ -169,7 +169,7 @@ class TestDownloadPdf:
         
         with tempfile.TemporaryDirectory() as tmpdir:
             save_path = os.path.join(tmpdir, "test.pdf")
-            await ews_client.download_pdf('http://192.168.1.100/Scan/Binary/xyz', save_path)
+            await ews_client.download_image('http://192.168.1.100/Scan/Binary/xyz', save_path)
             
             assert os.path.exists(save_path)
             with open(save_path, 'rb') as f:
@@ -181,4 +181,4 @@ class TestDownloadPdf:
         
         with pytest.raises(Exception), tempfile.TemporaryDirectory() as tmpdir:
             save_path = os.path.join(tmpdir, "test.pdf")
-            await ews_client.download_pdf('http://192.168.1.100/Scan/Binary/xyz', save_path)
+            await ews_client.download_image('http://192.168.1.100/Scan/Binary/xyz', save_path)

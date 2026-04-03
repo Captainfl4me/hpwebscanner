@@ -129,7 +129,7 @@ async def trigger_scan():
         filename = f"scan_{job_id}.jpg"
         save_path = f"{SAVE_FOLDER.rstrip('/')}/{filename}"
         
-        await client.download_pdf(next_doc_url, save_path)
+        await client.download_image(next_doc_url, save_path)
         
         # Update job status
         async with jobs_lock:

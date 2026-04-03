@@ -14,7 +14,7 @@ def mock_ews(monkeypatch):
         'next_document_url': 'http://192.168.1.100/Scan/Jobs/test123/NextDocument',
         'status': 'Submitted'
     })
-    mock.download_pdf = AsyncMock()
+    mock.download_image = AsyncMock()
     mock.close = AsyncMock()
     # Mock the httpx client used for health check
     mock_response = MagicMock()
@@ -49,8 +49,8 @@ def test_scan_endpoint_success(mock_ews):
         assert data["job_id"] == "test123"
         assert data["saved_path"] == "/tmp/scans/scan_test123.jpg"
         mock_ews.submit_scan_job.assert_called_once()
-        # download_pdf should be called with next_document_url
-        mock_ews.download_pdf.assert_called_once_with(
+        # download_image should be called with next_document_url
+        mock_ews.download_image.assert_called_once_with(
             'http://192.168.1.100/Scan/Jobs/test123/NextDocument',
             '/tmp/scans/scan_test123.jpg'
         )
@@ -79,8 +79,8 @@ def test_status_endpoint_after_scan(mock_ews):
         assert data["job_status"]["status"] == "Completed"
         assert data["job_status"]["saved_path"] == "/tmp/scans/scan_test123.jpg"
         
-        # download_pdf should be called with next_document_url
-        mock_ews.download_pdf.assert_called_once_with(
+        # download_image should be called with next_document_url
+        mock_ews.download_image.assert_called_once_with(
             'http://192.168.1.100/Scan/Jobs/test123/NextDocument',
             '/tmp/scans/scan_test123.jpg'
         )

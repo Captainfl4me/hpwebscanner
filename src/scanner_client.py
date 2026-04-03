@@ -136,11 +136,11 @@ class EWSClient:
             raise
     
 
-    async def download_pdf(self, pdf_url: str, destination_path: str) -> None:
-        """Download the PDF from the BinaryURL and save to file."""
+    async def download_image(self, image_url: str, destination_path: str) -> None:
+        """Download the image from the BinaryURL and save to file."""
         try:
-            logger.info(f"Downloading PDF from {pdf_url} to {destination_path}")
-            response = await self.client.get(pdf_url)
+            logger.info(f"Downloading image from {image_url} to {destination_path}")
+            response = await self.client.get(image_url)
             response.raise_for_status()
             
             # Ensure directory exists
@@ -151,13 +151,13 @@ class EWSClient:
             with open(destination_path, 'wb') as f:
                 f.write(response.content)
             
-            logger.info(f"PDF saved successfully to {destination_path}")
+            logger.info(f"Image saved successfully to {destination_path}")
             
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error downloading PDF: {e}")
+            logger.error(f"HTTP error downloading image: {e}")
             raise
         except Exception as e:
-            logger.error(f"Error downloading PDF: {e}")
+            logger.error(f"Error downloading image: {e}")
             raise
     
     async def scan(self, save_folder: str, 
@@ -186,7 +186,7 @@ class EWSClient:
             save_path = f"{save_folder.rstrip('/')}/{filename}"
             
             # Download directly from NextDocument URL
-            await self.download_pdf(next_doc_url, save_path)
+            await self.download_image(next_doc_url, save_path)
             result['saved_path'] = save_path
             result['status'] = 'Completed'
         
