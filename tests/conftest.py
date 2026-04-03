@@ -12,6 +12,13 @@ os.environ["SCANNER_IP"] = "192.168.1.100"  # dummy IP
 os.environ["SAVE_FOLDER"] = "/tmp/scans"
 os.environ["ALLOWED_IP"] = ""  # Allow all for testing
 
+import main
+
+@pytest.fixture(autouse=True)
+def clear_jobs():
+    """Clear the global jobs dict before each test to ensure isolation."""
+    main.jobs.clear()
+
 from main import app
 
 @pytest.fixture
