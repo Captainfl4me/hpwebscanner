@@ -161,24 +161,40 @@ class TestSubmitScanJob:
 class TestDownloadImage:
     @pytest.mark.asyncio
     async def test_success(self, ews_client, mock_httpx_client):
-        pdf_content = b"%PDF-1.4 test content"
+        image_content = b"\xff\xd8\xff\xe0\x00\x10JFIF test content"  # JPEG header
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.content = pdf_content
+        mock_response.content = image_content
+        mock_response.headers = {'Content-Type': 'image/jpeg'}
         mock_httpx_client.get = AsyncMock(return_value=mock_response)
         
         with tempfile.TemporaryDirectory() as tmpdir:
-            save_path = os.path.join(tmpdir, "test.pdf")
+            save_path = os.path.join(tmpdir, "test.jpg")
             await ews_client.download_image('http://192.168.1.100/Scan/Binary/xyz', save_path)
             
             assert os.path.exists(save_path)
             with open(save_path, 'rb') as f:
-                assert f.read() == pdf_content
+                assert f.read() == image_content
     
     @pytest.mark.asyncio
     async def test_http_error(self, ews_client, mock_httpx_client):
         mock_httpx_client.get = AsyncMock(side_effect=Exception("Download failed"))
         
         with pytest.raises(Exception), tempfile.TemporaryDirectory() as tmpdir:
-            save_path = os.path.join(tmpdir, "test.pdf")
+            save_path = os.path.join(tmpdir, "test.jpg")
             await ews_client.download_image('http://192.168.1.100/Scan/Binary/xyz', save_path)
+    
+    @pytest.mark.asyncio
+    async def test_invalid_content_type(self, ews_client, mock_httpx_client):
+        """Test that non-jpeg Content-Type raises ValueError."""
+        image_content = b"not really an image"
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = image_content
+        mock_response.headers = {'Content-Type': 'application/pdf'}
+        mock_httpx_client.get = AsyncMock(return_value=mock_response)
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = os.path.join(tmpdir, "test.jpg")
+            with pytest.raises(ValueError, match="Expected image/jpeg"):
+                await ews_client.download_image('http://192.168.1.100/Scan/Binary/xyz', save_path)

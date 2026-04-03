@@ -143,11 +143,16 @@ class EWSClient:
             response = await self.client.get(image_url)
             response.raise_for_status()
             
+            # Validate Content-Type is image/jpeg
+            content_type = response.headers.get('Content-Type', '')
+            if not content_type.startswith('image/jpeg'):
+                raise ValueError(f"Expected image/jpeg but got Content-Type: {content_type}")
+            
             # Ensure directory exists
             import os
             os.makedirs(os.path.dirname(destination_path), exist_ok=True)
             
-            # Write PDF file
+            # Write image file
             with open(destination_path, 'wb') as f:
                 f.write(response.content)
             
