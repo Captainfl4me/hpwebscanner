@@ -1,0 +1,16 @@
+services:
+  hpwebscanner:
+    image: ghcr.io/captainfl4me/hpwebscanner:latest
+    container_name: hpwebscanner
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SCANNER_IP=192.168.1.100
+      - SAVE_FOLDER=/scans
+      - ALLOWED_IP=
+      - LOG_LEVEL=INFO
+      - SSL_VERIFY=true
+      - MAX_JOBS=100
+    volumes:
+      - ./scans:/scans
