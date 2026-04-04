@@ -30,6 +30,13 @@ docker run -d \
   hpwebscanner
 ```
 
+### With Docker Compose
+
+```bash
+# Edit SCANNER_IP in docker-compose.yml, then:
+docker compose up -d
+```
+
 ### Direct Python
 
 ```bash
