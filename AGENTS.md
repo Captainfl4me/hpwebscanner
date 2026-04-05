@@ -1,14 +1,14 @@
 # hpwebscanner - Agent Guidelines
 
 ## Project Overview
-Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image (JPG) storage and scanner communication. Designed for Home Assistant integration.
+Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image storage and scanner communication. Designed for Home Assistant integration.
 
 ## Requirements
 - Python-based REST API with FastAPI
- - Three endpoints:
-   1. `/health` - Scanner connection status
-   2. `/scan` - Trigger scan and save image to predefined folder
-   3. `/status/{job_id}` - Get job status
+  - Three endpoints:
+    1. `/health` - Scanner connection status
+    2. `/scan` - Trigger scan and save image to predefined folder
+    3. `/status/{job_id}` - Get job status
   - Act as client to HP EWS/ESCL
   - Docker container: self-contained, exposes API
 - Origin validation via configurable ENV var (ALLOWED_IP)

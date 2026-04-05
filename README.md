@@ -63,6 +63,8 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 | `SAVE_FOLDER` | No | `./` | Directory to save scanned files |
 | `ALLOWED_IP` | No | `127.0.0.1` | Allowed client IP (empty = allow all) |
 | `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARN, ERROR) |
+| `SSL_VERIFY` | No | `true` | Enable/disable SSL verification |
+| `MAX_JOBS` | No | `100` | Maximum in-memory job entries |
 | `OUTPUT_FORMAT` | No | `jpg` | Output file format (`jpg` or `pdf`) |
 
 ## API Endpoints

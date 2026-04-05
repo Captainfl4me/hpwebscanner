@@ -25,10 +25,6 @@ class EWSClient:
         self.timeout = timeout
         self.verify_ssl = verify_ssl
         self.client = httpx.AsyncClient(timeout=timeout, follow_redirects=True, verify=verify_ssl)
-        # Default scan parameters
-        self.default_dpi = 300
-        self.default_width_mm = 210  # A4 width
-        self.default_height_mm = 297  # A4 height
     
     async def __aenter__(self):
         return self
@@ -163,10 +159,9 @@ class EWSClient:
             logger.error(f"Error downloading image: {e}")
             raise
     
-    async def scan(self, save_folder: str, 
+    async def scan(self, save_folder: str,
                    filename: Optional[str] = None,
-                   wait_for_completion: bool = True,
-                   **scan_kwargs) -> Dict[str, Any]:
+                   wait_for_completion: bool = True) -> Dict[str, Any]:
         """Complete scan workflow: submit job and immediately download result (ESCL protocol)."""
         # Submit scan job
         job_info = await self.submit_scan_job()
