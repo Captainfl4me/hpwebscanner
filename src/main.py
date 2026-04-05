@@ -10,6 +10,12 @@ from typing import Dict, Any
 import img2pdf
 from scanner_client import EWSClient
 
+# Configure logging first so we can log validation errors
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('hpwebscanner')
+
 # Environmental variables configuration
 SCANNER_IP = os.getenv("SCANNER_IP")
 SAVE_FOLDER = os.getenv("SAVE_FOLDER", "./")
@@ -20,7 +26,6 @@ OUTPUT_FORMAT = os.getenv("OUTPUT_FORMAT", "jpg").lower()
 
 VALID_OUTPUT_FORMATS = ("jpg", "pdf")
 if OUTPUT_FORMAT not in VALID_OUTPUT_FORMATS:
-    logger = logging.getLogger('hpwebscanner')
     logger.error(f"Invalid OUTPUT_FORMAT: {OUTPUT_FORMAT}. Must be one of: {', '.join(VALID_OUTPUT_FORMATS)}")
     sys.exit(1)
 
@@ -28,28 +33,20 @@ if OUTPUT_FORMAT not in VALID_OUTPUT_FORMATS:
 try:
     MAX_JOBS = int(os.getenv("MAX_JOBS", "100"))
 except ValueError:
-    logger = logging.getLogger('hpwebscanner')
     logger.error("MAX_JOBS environment variable must be an integer.")
     sys.exit(1)
 
 # Check required environment variables
 if not SCANNER_IP:
-    logger = logging.getLogger('hpwebscanner')
     logger.error("SCANNER_IP environment variable is required but not provided.")
     sys.exit(1)
 
-# Configure logging with validation of LOG_LEVEL
+# Apply log level
 try:
-    logging.basicConfig(
-        level=getattr(logging, LOG_LEVEL),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logger.setLevel(getattr(logging, LOG_LEVEL))
 except AttributeError:
-    # LOG_LEVEL is invalid
-    logger = logging.getLogger('hpwebscanner')
     logger.error(f"Invalid LOG_LEVEL: {LOG_LEVEL}. Must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL.")
     sys.exit(1)
-logger = logging.getLogger('hpwebscanner')
 
 # Validate SAVE_FOLDER exists and is writable
 try:

@@ -36,9 +36,6 @@ Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image (JPG
   - **SSL_VERIFY**: Environment variable for SSL verification (default: `true`)
   - **MAX_JOBS**: Environment variable for max in-memory job entries (default: `100`)
   - **OUTPUT_FORMAT**: Environment variable for output file format (default: `jpg`, options: `jpg`, `pdf`)
-  - **SSL_VERIFY**: Environment variable for SSL verification (default: `true`)
-  - **MAX_JOBS**: Environment variable for max in-memory job entries (default: `100`)
-  - **OUTPUT_FORMAT**: Environment variable for output file format (default: `jpg`, options: `jpg`, `pdf`)
 
 ## API Endpoints
 - `GET /health` - Returns scanner status (checks connectivity to `/eSCL/ScannerCapabilities`)

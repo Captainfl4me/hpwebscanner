@@ -13,6 +13,5 @@ services:
       - SSL_VERIFY=true
       - MAX_JOBS=100
       - OUTPUT_FORMAT=jpg
-      - OUTPUT_FORMAT=jpg
     volumes:
       - ./scans:/scans

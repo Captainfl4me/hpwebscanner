@@ -129,55 +129,6 @@ Get job status.
 }
 ```
 
-**Possible `status` values:** `healthy`, `degraded`, `unhealthy`
-
-### `POST /scan`
-
-Trigger scan, returns job ID and saved path.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "job_id": "12345",
-  "message": "Scan completed successfully",
-  "saved_path": "./scans/scan_12345.jpg"
-}
-```
-
-**Response (500):**
-```json
-{
-  "status": "error",
-  "message": "Failed to complete scan: <error details>"
-}
-```
-
-### `GET /status/{job_id}`
-
-Get job status.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "job_id": "12345",
-  "job_status": {
-    "job_url": "https://192.168.1.100/eSCL/ScanJobs/12345",
-    "status": "Completed",
-    "saved_path": "./scans/scan_12345.jpg"
-  }
-}
-```
-
-**Response (404):**
-```json
-{
-  "status": "error",
-  "message": "Job 12345 not found"
-}
-```
-
 ## Testing
 
 ```bash
