@@ -16,6 +16,20 @@ SAVE_FOLDER = os.getenv("SAVE_FOLDER", "./")
 ALLOWED_IP = os.getenv("ALLOWED_IP", "127.0.0.1")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
+OUTPUT_FORMAT = os.getenv("OUTPUT_FORMAT", "jpg").lower()
+
+VALID_OUTPUT_FORMATS = ("jpg", "pdf")
+if OUTPUT_FORMAT not in VALID_OUTPUT_FORMATS:
+    logger = logging.getLogger('hpwebscanner')
+    logger.error(f"Invalid OUTPUT_FORMAT: {OUTPUT_FORMAT}. Must be one of: {', '.join(VALID_OUTPUT_FORMATS)}")
+    sys.exit(1)
+OUTPUT_FORMAT = os.getenv("OUTPUT_FORMAT", "jpg").lower()
+
+VALID_OUTPUT_FORMATS = ("jpg", "pdf")
+if OUTPUT_FORMAT not in VALID_OUTPUT_FORMATS:
+    logger = logging.getLogger('hpwebscanner')
+    logger.error(f"Invalid OUTPUT_FORMAT: {OUTPUT_FORMAT}. Must be one of: {', '.join(VALID_OUTPUT_FORMATS)}")
+    sys.exit(1)
 
 # Validate and parse MAX_JOBS
 try:
@@ -70,6 +84,7 @@ logger.info(f"ALLOWED_IP: {ALLOWED_IP}")
 logger.info(f"LOG_LEVEL: {LOG_LEVEL}")
 logger.info(f"SSL_VERIFY: {SSL_VERIFY}")
 logger.info(f"MAX_JOBS: {MAX_JOBS}")
+logger.info(f"OUTPUT_FORMAT: {OUTPUT_FORMAT}")
 
 # Job storage and lock (kept for status tracking, though scans are immediate)
 jobs: Dict[str, Dict[str, Any]] = {}
@@ -185,19 +200,28 @@ async def trigger_scan():
                 'saved_path': None
             }
         
-        # Download the PDF immediately (no polling needed with ESCL)
-        filename = f"scan_{job_id}.jpg"
-        save_path = f"{SAVE_FOLDER.rstrip('/')}/{filename}"
-        
-        await client.download_image(next_doc_url, save_path)
-        
-        # Update job status
+        jpg_filename = f"scan_{job_id}.jpg"
+        jpg_path = f"{SAVE_FOLDER.rstrip('/')}/{jpg_filename}"
+
+        await client.download_image(next_doc_url, jpg_path)
+
+        if OUTPUT_FORMAT == "pdf":
+            import img2pdf
+            pdf_filename = f"scan_{job_id}.pdf"
+            save_path = f"{SAVE_FOLDER.rstrip('/')}/{pdf_filename}"
+            with open(save_path, "wb") as f:
+                f.write(img2pdf.convert(jpg_path))
+            os.remove(jpg_path)
+            logger.info(f"Converted JPG to PDF: {save_path}")
+        else:
+            save_path = jpg_path
+
         async with jobs_lock:
             if job_id in jobs:
                 jobs[job_id]['status'] = 'Completed'
                 jobs[job_id]['saved_path'] = save_path
-        
-        logger.info(f"Scan job {job_id} completed, PDF saved to {save_path}")
+
+        logger.info(f"Scan job {job_id} completed, file saved to {save_path}")
         
         return {
             "status": "success",

@@ -1,4 +1,5 @@
 fastapi[standard]
 httpx
+img2pdf
 pytest
 pytest-asyncio
