@@ -16,6 +16,7 @@ ENV PYTHONPATH=/app/src
 ENV SAVE_FOLDER=/scans
 ENV ALLOWED_IP=""
 ENV LOG_LEVEL="INFO"
+ENV OUTPUT_FORMAT="jpg"
 
 # Create scans directory
 RUN mkdir -p /scans

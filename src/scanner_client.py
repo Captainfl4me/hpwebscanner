@@ -1,7 +1,8 @@
-import asyncio
 import logging
+import os
 import xml.etree.ElementTree as ET
 from typing import Optional, Dict, Any
+from urllib.parse import urljoin
 import httpx
 
 logger = logging.getLogger('hpwebscanner')
@@ -114,8 +115,6 @@ class EWSClient:
                 raise ValueError("No Location header returned from scan job submission")
             
             # Construct next document URL by appending '/NextDocument'
-            # As per example-scan.py: urljoin(resp.headers['Location'] + '/', 'NextDocument')
-            from urllib.parse import urljoin
             next_doc_url = urljoin(job_url.rstrip('/') + '/', 'NextDocument')
             
             # Extract job ID from the job URL (last part after /)
@@ -150,7 +149,6 @@ class EWSClient:
                 raise ValueError(f"Expected image/jpeg but got Content-Type: {content_type}")
             
             # Ensure directory exists
-            import os
             os.makedirs(os.path.dirname(destination_path), exist_ok=True)
             
             # Write image file

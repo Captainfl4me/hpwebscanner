@@ -8,7 +8,7 @@ Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image (JPG
  - Two endpoints:
    1. `/health` - Scanner connection status
    2. `/scan` - Trigger scan and save JPG image to predefined folder
-- Act as client to HP EWS/ESCL (no PDF processing)
+ - Act as client to HP EWS/ESCL
  - (Future) Docker container: self-contained, exposes API
 - Origin validation via configurable ENV var (ALLOWED_IP)
 - Logging with configurable levels (INFO, WARN, ERROR)
@@ -23,9 +23,9 @@ Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image (JPG
 
 ## ESCL Protocol Details
 - Scan job submission: POST to `/eSCL/ScanJobs` with XML payload
-- Job status: Get `Location` header from response, append `/NextDocument` for PDF URL
+- Job status: Get `Location` header from response, append `/NextDocument` for image download URL
 - Scanner status: GET to `/eSCL/ScannerCapabilities` (used for health check)
-- PDF retrieval: GET from NextDocument URL (immediate with ESCL)
+- Image retrieval: GET from NextDocument URL (immediate with ESCL)
 
 ## Configuration
  - **SCANNER_IP**: (required) Environment variable for HP scanner address
@@ -35,7 +35,7 @@ Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image (JPG
 
 ## API Endpoints
 - `GET /health` - Returns scanner status (checks connectivity to `/eSCL/ScannerCapabilities`)
-- `POST /scan` - Initiates scan, returns job ID and saved PDF path
+- `POST /scan` - Initiates scan, returns job ID and saved image path
 - `GET /status/{job_id}` - Get status of a specific job (in-memory tracking)
 
 ## Running Unit Tests
@@ -61,7 +61,7 @@ pytest -k "test_build_scan_job_xml"
 Tests are located in the `tests/` directory and include:
 - `test_api.py` - API endpoint tests (health, scan)
 - `test_middleware.py` - Origin validation middleware tests
-- `test_scanner_client.py` - EWSClient unit tests (XML generation, job submission, PDF download)
+- `test_scanner_client.py` - EWSClient unit tests (XML generation, job submission, image download)
 
 ## Running the Application
 ```bash

@@ -1,5 +1,4 @@
-from fastapi import FastAPI, Request, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
@@ -7,7 +6,8 @@ import logging
 import os
 import sys
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any
+import img2pdf
 from scanner_client import EWSClient
 
 # Environmental variables configuration
@@ -16,13 +16,6 @@ SAVE_FOLDER = os.getenv("SAVE_FOLDER", "./")
 ALLOWED_IP = os.getenv("ALLOWED_IP", "127.0.0.1")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
-OUTPUT_FORMAT = os.getenv("OUTPUT_FORMAT", "jpg").lower()
-
-VALID_OUTPUT_FORMATS = ("jpg", "pdf")
-if OUTPUT_FORMAT not in VALID_OUTPUT_FORMATS:
-    logger = logging.getLogger('hpwebscanner')
-    logger.error(f"Invalid OUTPUT_FORMAT: {OUTPUT_FORMAT}. Must be one of: {', '.join(VALID_OUTPUT_FORMATS)}")
-    sys.exit(1)
 OUTPUT_FORMAT = os.getenv("OUTPUT_FORMAT", "jpg").lower()
 
 VALID_OUTPUT_FORMATS = ("jpg", "pdf")
@@ -133,8 +126,6 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(OriginValidationMiddleware, allowed_ip=ALLOWED_IP)
 
-
-
 @app.get("/health")
 async def health_check():
         logger.info("Health check endpoint accessed")
@@ -206,7 +197,6 @@ async def trigger_scan():
         await client.download_image(next_doc_url, jpg_path)
 
         if OUTPUT_FORMAT == "pdf":
-            import img2pdf
             pdf_filename = f"scan_{job_id}.pdf"
             save_path = f"{SAVE_FOLDER.rstrip('/')}/{pdf_filename}"
             with open(save_path, "wb") as f:
