@@ -12,6 +12,7 @@ from scanner_client import EWSClient
 
 # Configure logging first so we can log validation errors
 logging.basicConfig(
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('hpwebscanner')

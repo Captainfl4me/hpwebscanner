@@ -1,6 +1,6 @@
 # hpwebscanner
 
-REST API to trigger HP scanner (EWS/ESCL compatible) and save scanned JPG images. Designed for Home Assistant integration.
+REST API to trigger HP scanner (EWS/ESCL compatible) and save scanned images. Designed for Home Assistant integration.
 
 ## Features
 
