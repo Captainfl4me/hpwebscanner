@@ -134,7 +134,6 @@ class EWSClient:
         except Exception as e:
             logger.error(f"Error submitting scan job: {e}")
             raise
-    
 
     async def download_image(self, image_url: str, destination_path: str) -> None:
         """Download the image from the BinaryURL and save to file."""

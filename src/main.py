@@ -128,40 +128,40 @@ app.add_middleware(OriginValidationMiddleware, allowed_ip=ALLOWED_IP)
 
 @app.get("/health")
 async def health_check():
-        logger.info("Health check endpoint accessed")
-        try:
-            # Test basic connectivity to scanner by checking capabilities endpoint
-            client = app.state.ews_client
-            capabilities_url = f"{client.base_url}/eSCL/ScannerCapabilities"
-            response = await client.client.get(capabilities_url, timeout=5)
-            status_code = response.status_code
-            
-            # Proper HTTP status code classification
-            if 200 <= status_code < 300:
-                return {
-                    "status": "healthy",
-                    "message": "Server and scanner connection OK",
-                    "scanner_status_code": status_code
-                }
-            elif 300 <= status_code < 400:
-                return {
-                    "status": "degraded",
-                    "message": "Server running but scanner redirecting",
-                    "scanner_status_code": status_code
-                }
-            else:  # 4xx or 5xx
-                return {
-                    "status": "unhealthy",
-                    "message": "Server running but scanner error",
-                    "scanner_status_code": status_code
-                }
-        except Exception as e:
-            logger.warning(f"Health check failed to reach scanner: {e}")
+    logger.info("Health check endpoint accessed")
+    try:
+        # Test basic connectivity to scanner by checking capabilities endpoint
+        client = app.state.ews_client
+        capabilities_url = f"{client.base_url}/eSCL/ScannerCapabilities"
+        response = await client.client.get(capabilities_url, timeout=5)
+        status_code = response.status_code
+
+        # Proper HTTP status code classification
+        if 200 <= status_code < 300:
+            return {
+                "status": "healthy",
+                "message": "Server and scanner connection OK",
+                "scanner_status_code": status_code
+            }
+        elif 300 <= status_code < 400:
+            return {
+                "status": "degraded",
+                "message": "Server running but scanner redirecting",
+                "scanner_status_code": status_code
+            }
+        else:  # 4xx or 5xx
             return {
                 "status": "unhealthy",
-                "message": "Server running but scanner unreachable",
-                "error": str(e)
+                "message": "Server running but scanner error",
+                "scanner_status_code": status_code
             }
+    except Exception as e:
+        logger.warning(f"Health check failed to reach scanner: {e}")
+        return {
+            "status": "unhealthy",
+            "message": "Server running but scanner unreachable",
+            "error": str(e)
+        }
 
 @app.post("/scan")
 async def trigger_scan():
@@ -175,22 +175,19 @@ async def trigger_scan():
         job_id = job_info['job_id']
         job_url = job_info['job_url']
         next_doc_url = job_info['next_document_url']
-         
-        # Store initial job info
+
         async with jobs_lock:
-            # Enforce MAX_JOBS limit by removing oldest job if needed
             if len(jobs) >= MAX_JOBS:
-                # Pop the first (oldest) job
                 oldest_job_id = next(iter(jobs))
                 jobs.pop(oldest_job_id)
                 logger.debug(f"Removed oldest job {oldest_job_id} to enforce MAX_JOBS limit")
-            
+
             jobs[job_id] = {
                 'job_url': job_url,
                 'status': 'Downloading',
                 'saved_path': None
             }
-        
+
         jpg_filename = f"scan_{job_id}.jpg"
         jpg_path = f"{SAVE_FOLDER.rstrip('/')}/{jpg_filename}"
 

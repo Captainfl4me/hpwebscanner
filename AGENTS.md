@@ -5,9 +5,10 @@ Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image (JPG
 
 ## Requirements
 - Python-based REST API with FastAPI
- - Two endpoints:
+ - Three endpoints:
    1. `/health` - Scanner connection status
-   2. `/scan` - Trigger scan and save JPG image to predefined folder
+   2. `/scan` - Trigger scan and save image to predefined folder
+   3. `/status/{job_id}` - Get job status
  - Act as client to HP EWS/ESCL
  - (Future) Docker container: self-contained, exposes API
 - Origin validation via configurable ENV var (ALLOWED_IP)
@@ -27,11 +28,17 @@ Tool to trigger HP scanner (EWS/ESCL compatible) via REST API, handle image (JPG
 - Scanner status: GET to `/eSCL/ScannerCapabilities` (used for health check)
 - Image retrieval: GET from NextDocument URL (immediate with ESCL)
 
-## Configuration
- - **SCANNER_IP**: (required) Environment variable for HP scanner address
- - **SAVE_FOLDER**: Environment variable for image storage path (default: `./`)
- - **ALLOWED_IP**: Environment variable for API origin validation (default: `127.0.0.1`, empty string allows all)
- - **LOG_LEVEL**: Environment variable for logging (default: `INFO`)
+ ## Configuration
+  - **SCANNER_IP**: (required) Environment variable for HP scanner address
+  - **SAVE_FOLDER**: Environment variable for image storage path (default: `./`)
+  - **ALLOWED_IP**: Environment variable for API origin validation (default: `127.0.0.1`, empty string allows all)
+  - **LOG_LEVEL**: Environment variable for logging (default: `INFO`)
+  - **SSL_VERIFY**: Environment variable for SSL verification (default: `true`)
+  - **MAX_JOBS**: Environment variable for max in-memory job entries (default: `100`)
+  - **OUTPUT_FORMAT**: Environment variable for output file format (default: `jpg`, options: `jpg`, `pdf`)
+  - **SSL_VERIFY**: Environment variable for SSL verification (default: `true`)
+  - **MAX_JOBS**: Environment variable for max in-memory job entries (default: `100`)
+  - **OUTPUT_FORMAT**: Environment variable for output file format (default: `jpg`, options: `jpg`, `pdf`)
 
 ## API Endpoints
 - `GET /health` - Returns scanner status (checks connectivity to `/eSCL/ScannerCapabilities`)

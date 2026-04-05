@@ -5,8 +5,7 @@ REST API to trigger HP scanner (EWS/ESCL compatible) and save scanned JPG images
 ## Features
 
 - **REST API** with FastAPI (async)
-- **Two endpoints**: `/health` (scanner status) and `/scan` (trigger scan)
-- **Job tracking**: `/status/{job_id}` endpoint
+- **Three endpoints**: `/health` (scanner status), `/scan` (trigger scan), `/status/{job_id}` (job tracking)
 - **Origin validation**: Configurable IP whitelist
 - **Docker support**: Self-contained container
 - **Configurable**: Environment variables for scanner IP, storage path, logging
@@ -61,32 +60,121 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `SCANNER_IP` | Yes | - | IP address of HP scanner |
-| `SAVE_FOLDER` | No | `./` | Directory to save scanned JPG files |
+| `SAVE_FOLDER` | No | `./` | Directory to save scanned files |
 | `ALLOWED_IP` | No | `127.0.0.1` | Allowed client IP (empty = allow all) |
 | `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARN, ERROR) |
 | `OUTPUT_FORMAT` | No | `jpg` | Output file format (`jpg` or `pdf`) |
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Check scanner connectivity |
-| `POST` | `/scan` | Trigger scan, returns job ID and saved path |
-| `GET` | `/status/{job_id}` | Get job status |
+### `GET /health`
 
-### Example: Trigger Scan
+Check scanner connectivity.
 
-```bash
-curl -X POST http://localhost:8000/scan
+**Response (200):**
+```json
+{
+  "status": "healthy",
+  "message": "Server and scanner connection OK",
+  "scanner_status_code": 200
+}
 ```
 
-Response:
+**Possible `status` values:** `healthy`, `degraded`, `unhealthy`
+
+### `POST /scan`
+
+Trigger scan, returns job ID and saved path.
+
+**Response (200):**
 ```json
 {
   "status": "success",
   "job_id": "12345",
   "message": "Scan completed successfully",
   "saved_path": "./scans/scan_12345.jpg"
+}
+```
+
+**Response (500):**
+```json
+{
+  "status": "error",
+  "message": "Failed to complete scan: <error details>"
+}
+```
+
+### `GET /status/{job_id}`
+
+Get job status.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "job_id": "12345",
+  "job_status": {
+    "job_url": "https://192.168.1.100/eSCL/ScanJobs/12345",
+    "status": "Completed",
+    "saved_path": "./scans/scan_12345.jpg"
+  }
+}
+```
+
+**Response (404):**
+```json
+{
+  "status": "error",
+  "message": "Job 12345 not found"
+}
+```
+
+**Possible `status` values:** `healthy`, `degraded`, `unhealthy`
+
+### `POST /scan`
+
+Trigger scan, returns job ID and saved path.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "job_id": "12345",
+  "message": "Scan completed successfully",
+  "saved_path": "./scans/scan_12345.jpg"
+}
+```
+
+**Response (500):**
+```json
+{
+  "status": "error",
+  "message": "Failed to complete scan: <error details>"
+}
+```
+
+### `GET /status/{job_id}`
+
+Get job status.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "job_id": "12345",
+  "job_status": {
+    "job_url": "https://192.168.1.100/eSCL/ScanJobs/12345",
+    "status": "Completed",
+    "saved_path": "./scans/scan_12345.jpg"
+  }
+}
+```
+
+**Response (404):**
+```json
+{
+  "status": "error",
+  "message": "Job 12345 not found"
 }
 ```
 
@@ -99,5 +187,5 @@ pytest
 ## Notes
 
 - Python source code is located in `src/` directory
-- Scanned images are saved as JPG (ESCL protocol)
+- Scanned images are saved as JPG or PDF (controlled by `OUTPUT_FORMAT`)
 - Scanner must be EWS/ESCL compatible (HP network scanners)
